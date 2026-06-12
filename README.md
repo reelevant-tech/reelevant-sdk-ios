@@ -2,6 +2,8 @@
 
 Analytics tracking **and** real-time personalisation for iOS apps, powered by Reelevant.
 
+📖 **[Full documentation](https://docs.reelevant.com/platform-guide/omni-channels/mobile/sdk/ios)**
+
 ## How to use
 
 You need a `datasourceId` and a `companyId` to initialise the SDK:
