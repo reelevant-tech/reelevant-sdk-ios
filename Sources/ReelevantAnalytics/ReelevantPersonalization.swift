@@ -165,11 +165,12 @@ internal func executeRunnerCall(
             return
         }
 
-        let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type") ?? ""
-        let runId = httpResponse.value(forHTTPHeaderField: "x-rlvt-workflow-run-id")
-        let executionPathHeader = httpResponse.value(forHTTPHeaderField: "x-rlvt-execution-path")
-        let metadataHeader = httpResponse.value(forHTTPHeaderField: "x-rlvt-output-node-metadata")
-        let propertiesHeader = httpResponse.value(forHTTPHeaderField: "x-rlvt-output-properties")
+        let headers = httpResponse.allHeaderFields
+        let contentType = headers["Content-Type"] as? String ?? ""
+        let runId = headers["x-rlvt-workflow-run-id"] as? String
+        let executionPathHeader = headers["x-rlvt-execution-path"] as? String
+        let metadataHeader = headers["x-rlvt-output-node-metadata"] as? String
+        let propertiesHeader = headers["x-rlvt-output-properties"] as? String
 
         let executionPath = executionPathHeader?.components(separatedBy: ",") ?? []
         let metadata = metadataHeader.flatMap { safeJsonParseDictionary($0) } ?? [:]
