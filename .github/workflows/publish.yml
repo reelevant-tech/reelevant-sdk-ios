@@ -1,0 +1,47 @@
+name: Publish
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  test-and-tag:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Build
+        run: swift build
+      - name: Run tests
+        run: swift test
+      - name: Get version from Package.swift
+        id: version
+        run: |
+          # Extract version from the SDK source (sdkVersion constant)
+          VERSION=$(grep -o 'ios-[0-9]*\.[0-9]*\.[0-9]*' Sources/ReelevantAnalytics/ReelevantPersonalization.swift | head -1 | sed 's/ios-//')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          if git rev-parse "v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Create release tag
+        if: steps.check_tag.outputs.exists == 'false' && steps.version.outputs.version != ''
+        run: |
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false' && steps.version.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.version.outputs.version }}" \
+            --title "v${{ steps.version.outputs.version }}" \
+            --generate-notes
