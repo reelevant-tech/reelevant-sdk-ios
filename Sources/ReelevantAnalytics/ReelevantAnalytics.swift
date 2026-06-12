@@ -96,6 +96,9 @@ public class ReelevantAnalytics: NSObject {
             self.datasourceId = datasourceId
             self.endpoint = "https://collector.reelevant.com/collect/\(datasourceId)/rlvt"
             self.retry = 60 // 1m
+            self.runnerUrl = "https://reelevant.run"
+            self.personalizationTimeout = 5.0
+            self.fallback = .empty
         }
 
         let companyId: String
@@ -103,6 +106,12 @@ public class ReelevantAnalytics: NSObject {
         var currentUrl: String?
         var endpoint: String
         var retry: Double
+        /// Runner endpoint URL for personalization (default: production runner).
+        public var runnerUrl: String
+        /// Global timeout in seconds for runner calls (default: 5s).
+        public var personalizationTimeout: TimeInterval
+        /// Fallback strategy when a runner call fails (Swift-only, not visible to ObjC).
+        @nonobjc public var fallback: FallbackStrategy
     }
 
     /**
@@ -298,6 +307,83 @@ public class ReelevantAnalytics: NSObject {
          */
         public func setCurrentURL (url: String) {
             self.configuration.currentUrl = url
+        }
+
+        // MARK: - Personalization API
+
+        /**
+            Execute a single workflow run.
+            Returns a typed RunResult with a discriminated body.
+            userId is auto-resolved from stored identity (setUser / tmpId) unless overridden in options.
+         */
+        @available(iOS 13.0, macOS 10.15, *)
+        public func run (_ options: RunOptions) async throws -> RunResult {
+            let effectiveUserId = options.userId ?? self.resolveUserId()
+            do {
+                let result = try await executeRunnerCallAsync(
+                    options: options,
+                    runnerUrl: self.configuration.runnerUrl,
+                    timeout: self.configuration.personalizationTimeout,
+                    userId: effectiveUserId
+                )
+                return result
+            } catch {
+                return try self.handleRunError(options: options, error: error)
+            }
+        }
+
+        /**
+            Execute multiple workflow runs concurrently.
+            Returns results in the same order as the input options.
+         */
+        @available(iOS 13.0, macOS 10.15, *)
+        public func runAll (_ optionsList: [RunOptions]) async -> [RunResult] {
+            await withTaskGroup(of: (Int, RunResult).self) { group in
+                for (index, options) in optionsList.enumerated() {
+                    group.addTask {
+                        let result = (try? await self.run(options)) ?? RunResult(
+                            status: 0, source: .fallback, body: .empty,
+                            metadata: [:], properties: [:], runId: nil,
+                            executionPath: [], redirectionUrl: ""
+                        )
+                        return (index, result)
+                    }
+                }
+                var results = [(Int, RunResult)]()
+                for await item in group {
+                    results.append(item)
+                }
+                return results.sorted { $0.0 < $1.0 }.map { $0.1 }
+            }
+        }
+
+        /**
+            Fire-and-forget click tracking. Calls the runner click endpoint without following redirects.
+         */
+        public func trackClick (result: RunResult) {
+            result._trackClick()
+        }
+
+        private func resolveUserId () -> String {
+            let defaults = UserDefaults.standard
+            return defaults.string(forKey: ReelevantAnalytics.UserIdConfigurationKey)
+                ?? defaults.string(forKey: ReelevantAnalytics.TemporaryUserIdConfigurationKey)
+                ?? self.randomIdentifier()
+        }
+
+        private func handleRunError (options: RunOptions, error: Error) throws -> RunResult {
+            switch self.configuration.fallback {
+            case .error:
+                throw error
+            case .custom(let handler):
+                return handler(options, error)
+            case .empty:
+                return RunResult(
+                    status: 0, source: .fallback, body: .empty,
+                    metadata: [:], properties: [:], runId: nil,
+                    executionPath: [], redirectionUrl: ""
+                )
+            }
         }
         
         /**
