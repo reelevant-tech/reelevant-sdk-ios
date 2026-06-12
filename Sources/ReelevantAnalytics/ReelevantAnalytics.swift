@@ -337,20 +337,16 @@ public class ReelevantAnalytics: NSObject {
             Returns results in the same order as the input options.
          */
         @available(iOS 13.0, macOS 10.15, *)
-        public func runAll (_ optionsList: [RunOptions]) async -> [RunResult] {
-            await withTaskGroup(of: (Int, RunResult).self) { group in
+        public func runAll (_ optionsList: [RunOptions]) async throws -> [RunResult] {
+            try await withThrowingTaskGroup(of: (Int, RunResult).self) { group in
                 for (index, options) in optionsList.enumerated() {
                     group.addTask {
-                        let result = (try? await self.run(options)) ?? RunResult(
-                            status: 0, source: .fallback, body: .empty,
-                            metadata: [:], properties: [:], runId: nil,
-                            executionPath: [], redirectionUrl: ""
-                        )
+                        let result = try await self.run(options)
                         return (index, result)
                     }
                 }
                 var results = [(Int, RunResult)]()
-                for await item in group {
+                for try await item in group {
                     results.append(item)
                 }
                 return results.sorted { $0.0 < $1.0 }.map { $0.1 }
