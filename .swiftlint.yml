@@ -14,6 +14,12 @@ disabled_rules:
   - type_body_length
   - file_length
   - identifier_name
+  - function_name_whitespace
+  - implicit_optional_initialization
+  - opening_brace
+  - syntactic_sugar
+  - trailing_whitespace
+  - unused_closure_parameter
 
 opt_in_rules:
   - empty_count
