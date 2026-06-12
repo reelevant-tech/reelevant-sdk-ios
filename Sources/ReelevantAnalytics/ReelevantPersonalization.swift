@@ -193,16 +193,18 @@ internal func executeRunnerCall(
     task.resume()
 }
 
+private let noRedirectSession: URLSession = {
+    let config = URLSessionConfiguration.default
+    return URLSession(configuration: config, delegate: NoRedirectDelegate.shared, delegateQueue: nil)
+}()
+
 internal func fireAndForgetClick(url urlString: String, timeout: TimeInterval) {
     guard let url = URL(string: urlString) else { return }
     var request = URLRequest(url: url)
     request.httpMethod = "GET"
     request.timeoutInterval = timeout
     request.setValue(sdkVersion, forHTTPHeaderField: "x-rlvt-sdk-version")
-    // Don't follow redirects — we just need the runner to register the click
-    let config = URLSessionConfiguration.default
-    let session = URLSession(configuration: config, delegate: NoRedirectDelegate.shared, delegateQueue: nil)
-    let task = session.dataTask(with: request) { _, _, _ in /* fire-and-forget */ }
+    let task = noRedirectSession.dataTask(with: request) { _, _, _ in /* fire-and-forget */ }
     task.resume()
 }
 
@@ -248,7 +250,7 @@ private func buildRunnerUrlString(
         items.append(URLQueryItem(name: "locale", value: locale))
     }
     options.params?.forEach { key, value in
-        items.append(URLQueryItem(name: key, value: value))
+        if key != "rlvt-u" { items.append(URLQueryItem(name: key, value: value)) }
     }
     components.queryItems = items
     return components.url!.absoluteString
