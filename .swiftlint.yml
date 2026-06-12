@@ -20,7 +20,4 @@ disabled_rules:
   - syntactic_sugar
   - trailing_whitespace
   - unused_closure_parameter
-
-opt_in_rules:
-  - empty_count
-  - closure_spacing
+  - control_statement
