@@ -9,7 +9,7 @@ jobs:
   lint:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
       - name: SwiftLint
         run: |
           brew install swiftlint
@@ -18,7 +18,7 @@ jobs:
   test:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.4.0
       - name: Build
         run: swift build
       - name: Run tests
